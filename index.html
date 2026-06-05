@@ -118,7 +118,6 @@
             background: linear-gradient(90deg, #ef4444, #dc2626);
         }
 
-        /* 2048 Grid Matrix */
         .grid-container {
             width: 360px;
             height: 360px;
@@ -148,7 +147,6 @@
             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
-        /* Cyberpunk Tiles Styles */
         .tile-2    { background: #1e293b; color: #94a3b8; border: 1px solid rgba(255,255,255,0.05); }
         .tile-4    { background: #334155; color: #cbd5e1; border: 1px solid rgba(255,255,255,0.05); }
         .tile-8    { background: #1e3a8a; color: var(--cyber-blue); border: 1px solid #2563eb; }
@@ -181,7 +179,6 @@
         .overlay-win      { background: rgba(155, 48, 106, 0.9); color: white; }
         .overlay-gate     { background: rgba(10, 14, 23, 0.85); color: #94a3b8; font-size: 16px; border: 1px dashed rgba(209, 59, 125, 0.3); text-align: center; padding: 20px; }
 
-        /* Leaderboard */
         .leaderboard-panel {
             width: 100%;
             background: var(--panel-bg);
@@ -233,7 +230,6 @@
             font-weight: bold;
         }
 
-        /* Wallet Panel */
         #blockchain-panel {
             background: var(--panel-bg);
             padding: 15px;
@@ -278,7 +274,6 @@
 <body>
 
     <div class="app-container">
-        
         <div class="heading">
             <h1>Arc 2048 <span style="color:var(--cyber-pink)">Game</span></h1>
         </div>
@@ -313,14 +308,12 @@
             <p id="web3-status">Sync pipeline offline</p>
             <p id="onchain-high">On-Chain High: --</p>
         </div>
-
     </div>
 
     <script>
         // ─── CONFIGURATION ───────────────────────────────────────────────────
-        // ඔබේ අලුත්ම Smart Contract ලිපිනය සාර්ථකව සම්බන්ධ කරන ලදී
-        const contractAddress = "0x50910a743d909027B5eb7f4a40A0bcaB596811A5"; 
-        const autoplayFeeInUsdc = "1.0"; 
+        // FIXED: ඔබගේ නව නිවැරදි කළ Smart Contract ලිපිනය මෙයට ඇතුළත් කළා
+        const contractAddress = "0xC9E4DeBa47d6B0df31F7eDE05F53C1DBF7DAa380"; 
 
         try { ethers.logging = "off"; } catch(e) {}
 
@@ -374,28 +367,28 @@
             await uploadScore(score);
         }
 
-        // AUTO-PLAY CONTROLLER SENT TO SMART CONTRACT INTERFACE
+        // FIXED: AUTO-PLAY INTERACTION (සැබෑ 1 USDC ක් කැපෙන ලෙස සකස් කළා)
         async function toggleAutoplay() {
             if (!isWalletConnected) return;
 
             if (autoplayInterval) {
                 stopAutoplay();
             } else {
-                document.getElementById('web3-status').innerText = `Sending 1 USDC to Contract...`;
+                document.getElementById('web3-status').innerText = `Sending 1.0 USDC (Gas Coin)...`;
                 
                 try {
-                    // නව ආරක්ෂිත Smart Contract එකෙහි ඇති 'unlockAutoplay' function එක call කිරීම.
-                    // මෙයින් 1 USDC (Decimals 6) සෘජුවම Contract එකට ගෙවනු ලබයි.
+                    // FIXED: Contract එකේ '1 ether' කොන්දේසිය සපුරාලීමට නිවැරදිව 10^18 Wei අගය යවයි
                     const txResponse = await contract.unlockAutoplay({
-                        value: ethers.parseUnits(autoplayFeeInUsdc, 6) 
+                        value: ethers.parseEther("1.0") 
                     });
 
-                    document.getElementById('web3-status').innerText = "Verifying Premium Pass...";
+                    document.getElementById('web3-status').innerText = "Verifying On-Chain Pass...";
                     await txResponse.wait(); 
                     document.getElementById('web3-status').innerText = "Premium Pass Active! 🤖";
                 } catch (txError) {
+                    console.error(txError);
                     document.getElementById('web3-status').innerText = "Payment cancelled/failed.";
-                    alert(`You must complete the ${autoplayFeeInUsdc} USDC contract payment to unlock Auto-Play!`);
+                    alert("Transaction rejected or insufficient Arc Testnet Native tokens.");
                     return;
                 }
 
@@ -422,7 +415,7 @@
                 autoplayInterval = null;
             }
             if (isWalletConnected) {
-                document.getElementById('autoplayBtn').innerText = `🤖 Start Auto-Play (${autoplayFeeInUsdc} USDC)`;
+                document.getElementById('autoplayBtn').innerText = `🤖 Start Auto-Play (1 USDC)`;
             }
             document.getElementById('autoplayBtn').classList.remove('active');
         }
@@ -479,7 +472,6 @@
             }
         }
 
-        // Game Matrix ලොජික් කොටස්
         function addRandomTile() {
             let empty = board.map((v, i) => v === 0 ? i : null).filter(v => v !== null);
             if (empty.length > 0) board[empty[Math.floor(Math.random() * empty.length)]] = Math.random() < 0.9 ? 2 : 4;
@@ -492,7 +484,7 @@
                     a[i] *= 2;
                     score += a[i];
                     a.splice(i + 1, 1);
-                    }
+                }
             }
             while (a.length < 4) a.push(0);
             return a;
@@ -563,12 +555,11 @@
         // ─── WEB3 ETHERS CONFIG ──────────────────────────────────────────────
         let provider, signer, contract;
         
-        // අලුත් Contract එකෙහි ඇති unlockAutoplay(payable) ශ්‍රිතය ABI එකට එකතු කරන ලදී.
         const contractABI = [
             "function submitScore(uint256 _finalScore) public payable",
             "function unlockAutoplay() public payable",
             "function getHighScore(address _player) public view returns (uint256)",
-            "function getTopScores() public view returns (address[] memory players, uint256[] memory scores)"
+            "function getTopScores() public view returns (address[] memory playersList, uint256[] memory scoresList)"
         ];
 
         async function connectWallet() {
@@ -594,7 +585,7 @@
                                 params: [{
                                     chainId: '0x4cef52',
                                     chainName: 'Arc Testnet',
-                                    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
+                                    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
                                     rpcUrls: ['https://arc-testnet.drpc.org'], 
                                     blockExplorerUrls: ['https://testnet.arcscan.app']
                                 }]
@@ -612,7 +603,6 @@
                 document.getElementById('web3-status').innerText = 'Node: ' + accounts[0].substring(0,6) + '...' + accounts[0].substring(36);
                 
                 document.getElementById('autoplayBtn').disabled = false;
-                document.getElementById('autoplayBtn').innerText = `🤖 Start Auto-Play (${autoplayFeeInUsdc} USDC)`;
                 document.getElementById('newGameBtn').disabled = false;
 
                 initGame(); 
@@ -633,42 +623,45 @@
                 document.getElementById('onchain-high').innerText = 'On-Chain High: ' + hs.toString();
                 lbBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Syncing on-chain logs...</td></tr>';
                 
-                const [players, scores] = await contract.getTopScores();
-                if (players.length === 0) {
+                const [playersList, scoresList] = await contract.getTopScores();
+                if (!playersList || playersList.length === 0) {
                     lbBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#475569; padding: 15px 0;">No active records found.</td></tr>';
                     return;
                 }
 
                 lbBody.innerHTML = '';
-                for (let i = 0; i < players.length; i++) {
+                for (let i = 0; i < playersList.length; i++) {
                     let row = document.createElement('tr');
                     let rankStyle = (i === 0) ? 'style="color:#f59e0b;"' : '';
                     let scoreStyle = (i === 0) ? 'style="text-align:right; font-weight:bold; color:var(--cyber-blue);"' : 'style="text-align:right;"';
-                    let shortAddr = players[i].substring(0, 8) + '...' + players[i].substring(36);
-                    let userTag = (players[i].toLowerCase() === playerAddr.toLowerCase()) ? '<span style="color:var(--cyber-pink); font-size:11px;">(You)</span>' : '';
+                    let shortAddr = playersList[i].substring(0, 8) + '...' + playersList[i].substring(36);
+                    let userTag = (playersList[i].toLowerCase() === playerAddr.toLowerCase()) ? '<span style="color:var(--cyber-pink); font-size:11px;">(You)</span>' : '';
                     
                     row.innerHTML = `
                         <td><span class="rank-badge" ${rankStyle}>${i + 1}</span></td>
                         <td>${shortAddr} ${userTag}</td>
-                        <td ${scoreStyle}>${scores[i].toString()}</td>
+                        <td ${scoreStyle}>${scoresList[i].toString()}</td>
                     `;
                     lbBody.appendChild(row);
                 }
                 document.getElementById('sync-time').innerText = 'Synced';
                 flushConsolePipeline(); 
             } catch (error) {
+                console.error(error);
                 lbBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#ef4444; padding: 10px 0;">Live array lookup error.</td></tr>`;
             }
         }
 
+        // FIXED: SCORE SUBMISSION (සැබෑ 1 USDC ක් කැපෙන ලෙස සකස් කළා)
         async function uploadScore(targetScore) {
             if (!contract || targetScore === 0 || scoreSubmittedThisSession || !isWalletConnected) return;
             try {
                 document.getElementById('web3-status').innerText = 'Sign request pending...';
                 
-                // Autoplay දැමූ ක්‍රීඩකයෙකු නම්, submitScore function එක call කරන විට value එක 0 ලෙස යවයි (මන්ද Contract එක තුළ එය නොමිලේ හැසිරවීමට සකසා ඇත).
-                // Autoplay නොකරන සාමාන්‍ය ක්‍රීඩකයෙකුගෙන්ද 1 USDC අය කිරීමට අවශ්‍ය නම් මෙහි value එක 'ethers.parseUnits("1.0", 6)' ලෙස වෙනස් කළ හැක.
-                const tx = await contract.submitScore(targetScore, { value: 0 });
+                // FIXED: Contract එකේ require(msg.value >= 1 ether) නිසා මෙතනටත් parseEther("1.0") යොදා ඇත
+                let paymentValue = ethers.parseEther("1.0"); 
+                
+                const tx = await contract.submitScore(targetScore, { value: paymentValue });
                 
                 document.getElementById('web3-status').innerText = 'Mining Block...';
                 await tx.wait();
@@ -680,6 +673,7 @@
                 const activeAcc = await signer.getAddress();
                 fetchRealLeaderboard(activeAcc);
             } catch (err) {
+                console.error(err);
                 document.getElementById('web3-status').innerText = 'Sync rejected or gas error.';
             }
         }
