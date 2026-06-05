@@ -318,8 +318,8 @@
 
     <script>
         // ─── CONFIGURATION ───────────────────────────────────────────────────
-        // ඔයා ලියපු අලුත්ම Smart Contract Address එක සාර්ථකව සම්බන්ධ කරන ලදී
-        const contractAddress = "0xd48E7080A28555725342855b5744c0751ae3346E"; 
+        // ඔබේ අලුත්ම Smart Contract ලිපිනය සාර්ථකව සම්බන්ධ කරන ලදී
+        const contractAddress = "0x50910a743d909027B5eb7f4a40A0bcaB596811A5"; 
         const autoplayFeeInUsdc = "1.0"; 
 
         try { ethers.logging = "off"; } catch(e) {}
@@ -374,7 +374,7 @@
             await uploadScore(score);
         }
 
-        // AUTO-PLAY CONTROLLER SENT TO CONTRACT ADDRESS
+        // AUTO-PLAY CONTROLLER SENT TO SMART CONTRACT INTERFACE
         async function toggleAutoplay() {
             if (!isWalletConnected) return;
 
@@ -384,13 +384,12 @@
                 document.getElementById('web3-status').innerText = `Sending 1 USDC to Contract...`;
                 
                 try {
-                    // සල්ලි කෙලින්ම යන්නේ ඔයාගේ Smart Contract Address එකටයි
-                    const txPayload = {
-                        to: contractAddress,
+                    // නව ආරක්ෂිත Smart Contract එකෙහි ඇති 'unlockAutoplay' function එක call කිරීම.
+                    // මෙයින් 1 USDC (Decimals 6) සෘජුවම Contract එකට ගෙවනු ලබයි.
+                    const txResponse = await contract.unlockAutoplay({
                         value: ethers.parseUnits(autoplayFeeInUsdc, 6) 
-                    };
-                    
-                    const txResponse = await signer.sendTransaction(txPayload);
+                    });
+
                     document.getElementById('web3-status').innerText = "Verifying Premium Pass...";
                     await txResponse.wait(); 
                     document.getElementById('web3-status').innerText = "Premium Pass Active! 🤖";
@@ -480,6 +479,7 @@
             }
         }
 
+        // Game Matrix ලොජික් කොටස්
         function addRandomTile() {
             let empty = board.map((v, i) => v === 0 ? i : null).filter(v => v !== null);
             if (empty.length > 0) board[empty[Math.floor(Math.random() * empty.length)]] = Math.random() < 0.9 ? 2 : 4;
@@ -492,7 +492,7 @@
                     a[i] *= 2;
                     score += a[i];
                     a.splice(i + 1, 1);
-                }
+                    }
             }
             while (a.length < 4) a.push(0);
             return a;
@@ -563,8 +563,10 @@
         // ─── WEB3 ETHERS CONFIG ──────────────────────────────────────────────
         let provider, signer, contract;
         
+        // අලුත් Contract එකෙහි ඇති unlockAutoplay(payable) ශ්‍රිතය ABI එකට එකතු කරන ලදී.
         const contractABI = [
-            "function submitScore(uint256 _score) public",
+            "function submitScore(uint256 _finalScore) public payable",
+            "function unlockAutoplay() public payable",
             "function getHighScore(address _player) public view returns (uint256)",
             "function getTopScores() public view returns (address[] memory players, uint256[] memory scores)"
         ];
@@ -597,7 +599,7 @@
                                     blockExplorerUrls: ['https://testnet.arcscan.app']
                                 }]
                             });
-                        } catch (addError) { }
+                        } catch (addError) {}
                     }
                 }
 
@@ -663,7 +665,11 @@
             if (!contract || targetScore === 0 || scoreSubmittedThisSession || !isWalletConnected) return;
             try {
                 document.getElementById('web3-status').innerText = 'Sign request pending...';
-                const tx = await contract.submitScore(targetScore);
+                
+                // Autoplay දැමූ ක්‍රීඩකයෙකු නම්, submitScore function එක call කරන විට value එක 0 ලෙස යවයි (මන්ද Contract එක තුළ එය නොමිලේ හැසිරවීමට සකසා ඇත).
+                // Autoplay නොකරන සාමාන්‍ය ක්‍රීඩකයෙකුගෙන්ද 1 USDC අය කිරීමට අවශ්‍ය නම් මෙහි value එක 'ethers.parseUnits("1.0", 6)' ලෙස වෙනස් කළ හැක.
+                const tx = await contract.submitScore(targetScore, { value: 0 });
+                
                 document.getElementById('web3-status').innerText = 'Mining Block...';
                 await tx.wait();
                 
